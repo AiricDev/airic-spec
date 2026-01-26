@@ -1,169 +1,123 @@
 ## **Airic Spec v0.2**
 
-**Document-Centric Agent Runtime Model**
+**Memory-Centric Agent Runtime Model**
 
 ### **1. Overview**
 
-Airic defines a **document-driven runtime architecture** for human–AI collaboration.
-It treats *documents as executable context* — the canonical source of truth for agent behavior, workflows, and quality criteria.
-Rather than aiming for one-shot automation, Airic establishes a **composable, auditable collaboration protocol** between humans and AI.
+Airic v0.2 defines a **memory-based agent runtime architecture**.
+
+In this model, an Agent's identity is defined not by its instructions, but by its **exclusive memory context** (Context Sharding). Its capabilities (Skills), conversely, are not hardcoded but are **dynamically loaded from Live Documents**.
+
+Collaboration achieves scalability by adhering to a strict **Message Passing** protocol between these distinct memory contexts, rather than relying on a shared global context window.
 
 ---
 
-### **2. Core Principles**
+### **2. Core Operational Principles**
 
-1. **Everything is a Document**
-   Every behavior, workflow, schema, or template exists as a Markdown document with lightweight metadata.
-   Documents are both persistent memory and executable runtime.
+1.  **Memory as Identity (Context Sharding)**
+    An Agent is defined by the specific slice of data it "remembers" functionality (e.g., "The Payment Service Agent" vs "The Personal Journal Agent").
+    *   *Principle*: Context is the scarce resource. Physical isolation of context ensures high attention density and reduces hallucination.
 
-2. **Declarative Runtime Binding**
-   Each work document declares:
+2.  **Document as Skill (Dynamic Loading)**
+    Skills are explicitly defined in **Live Documents** (SOPs, Prompt Templates, Tool sets). Any Agent (Memory Entity) can load any Skill Document to perform a specific type of work.
+    *   *Formula*: `Runtime Agent = Specific Memory (Identity) + Loaded Skill Document (Capability)`
 
-   ```yaml
-   agent: <AgentName>
-   doctype: <DoctypeName>
-   ```
+3.  **Collaboration via Message Passing**
+    Agents do not share a global context. When Agent A needs information from Agent B, it must explicitly request it via a message.
+    *   *Analogy*: Like microservices communicating via API, or humans communicating via Slack. This enforces clear system boundaries.
 
-   These references link to other documents that define how the agent thinks and how the document should be structured.
-
-3. **Self-Describing System**
-   The very documents that define agents and doctypes are themselves governed by other doctypes.
-   Airic is recursive — its own architecture is described within the same model (“documents all the way down”).
-
-4. **Live Collaboration**
-   Documents are *active*: agents read, plan, execute, and write back directly into the same document, creating a continuous feedback loop.
-
-5. **Inheritance and Local Overrides**
-   Documents form a tree. Parent docs set shared rules; child docs inherit context and override locally.
-   This promotes consistency without rigidity.
+4.  **Everything is a Document**
+    The system remains self-describing. Memory definitions, Skill definitions, and Task instances are all structured Markdown documents.
 
 ---
 
-### **3. Document Types**
+### **3. The Runtime Model**
 
-#### **3.1. Recursive Definition**
+#### **3.1. Anatomy of a Runtime Entity**
 
-Airic does not hard-code document types.
-Instead, it defines *patterns of metadata and structure* that themselves live as documents.
+A running Agent instance is instantiated by a Work Document declaring two orthogonal bindings:
 
-Example chain:
-
-```text
-Doctype → defines → Agent Definition
-Agent Definition → defines → Agent Behavior
-Doctype Definition → is defined by → Doctype: "Doctype Definition"
+```yaml
+---
+agent: <MemorySpec>   # WHO: Defines the Context/Memory Scope
+skill: <SkillSpec>    # HOW: Defines the Capability/Methodology
+---
 ```
 
-This recursive property means the system can evolve, extend, or rewrite its own meta-layer entirely through documents — no external code changes required.
-Agents can help users author new agent or doctype definitions within the same environment, effectively *co-creating the system that defines them*.
+#### **3.2. Document Types (The "Everything is a Document" Hierarchy)**
 
-#### **3.2. Foundational Doctypes (Reference Set)**
+The architecture distinguishes between three primary document types:
 
-While users can define arbitrary doctypes, a minimal bootstrapping set is provided:
+| Document Type | Role | Content Definition |
+| :--- | :--- | :--- |
+| **Memory Spec** | **Identity** | Defines data source bindings (e.g., folders, repos), read/write permissions, and persistable long-term memory. |
+| **Skill Spec** | **Capability** | Defines System Prompts, available Tools, Function Calls, Standard Operating Procedures (SOPs), and Checklists. |
+| **Task Instance** | **Workspace** | The actual instance of work. It binds a Memory Spec and a Skill Spec to execute a specific task. |
 
-| Doctype                 | Purpose                                               | Example Metadata                                                       |
-| ----------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------- |
-| **Agent Definition**    | Defines persona, tone, tools, and collaboration rules | `system_prompt`, `tools_allowed`, `protocol`, `output_schema`          |
-| **Doctype Definition**  | Defines structure and quality criteria                | `sections`, `mandatory_fields`, `acceptance_criteria`, `review_rubric` |
-| **Workflow Definition** | Encodes executable, stepwise logic                    | `steps`, `inputs`, `outputs`, `expected_results`                       |
-| **Work Document**       | User-facing doc binding agent + doctype               | `agent:`, `doctype:` metadata                                          |
-| **Meta-Doctype**        | Describes the schema of doctypes themselves           | Used to generate or validate new doctypes                              |
+#### **3.3. Collaboration Protocol**
 
-These are reference implementations only — they can be extended, versioned, or replaced.
+1.  **Intra-Agent Loop (The "Focus" Mode)**
+    *   The Agent loads its **Memory Spec** (e.g., the current codebase) and the **Skill Spec** (e.g., "Refactoring Guide").
+    *   It reads the **Task Instance**.
+    *   It executes the task steps, writing results and artifacts directly back into the Task Instance.
 
----
-
-### **4. Runtime Behavior**
-
-1. **Agent Instantiation**
-   The runtime loads the referenced `agent:` document, constructing a composite system prompt and tool context.
-
-2. **Context Stack Assembly**
-   Parent documents are traversed to build an inherited context stack; shared rules and variables propagate downward.
-
-3. **Structural Enforcement**
-   The `doctype:` definition enforces required sections and validation rubrics, providing explicit collaboration scaffolding.
-
-4. **In-Page Execution**
-   Workflow steps are executed within the live document. Agents write results and commentary back in-page.
-
-5. **Context Indexing**
-   All live documents and discussions form a searchable, graph-like knowledge base. Agents query this index for precise context retrieval.
+2.  **Inter-Agent Communication (The "Collaboration" Mode)**
+    *   **Trigger**: The Agent realizes it lacks necessary context (e.g., "I see the API call, but I don't know the database schema").
+    *   **Action**: The Agent uses a `send_message` tool.
+    *   **Routing**: The message is routed to the Agent defined by the target's Memory Spec (e.g., "Database Agent").
+    *   **Response**: The target Agent processes the request within *its own* context and returns a concise answer.
+    *   **Integration**: The response is pasted explicitly into the requesting Agent's context.
 
 ---
 
-### **5. Example**
+### **4. Example Scenarios**
 
+#### **Scenario A: The Specialized Developer**
+
+**Document**: `tasks/feature-implementation.md`
 ```markdown
 ---
-agent: ResearchPartner
-doctype: ResearchBrief
+agent: agents/backend-service-mem.md   # Identity: Has access to Backend Repo & Logs
+skill: skills/tdd-implementation.md    # Skill: Knows Test-Driven Development flow
 ---
-
-# Topic
-LLM-driven UI generation
 
 # Objective
-Survey approaches for declarative interface synthesis.
+Implement the new specific User API.
 
-# Findings
+# Agent Execution
+1. [Skill] Writing failing test case...
+2. [Memory] Reading `src/models/User.ts`...
+3. [Action] Implementation complete.
+```
+
+#### **Scenario B: Cross-Context Collaboration**
+
+**Document**: `tasks/system-integration.md`
+```markdown
+---
+agent: agents/frontend-mem.md
+skill: skills/api-integration.md
+---
+
+# Agent Execution
 ...
-```
-
-```markdown
-# Agent: ResearchPartner
-system_prompt: >
-  You are a methodical research partner who decomposes problems
-  and structures findings clearly.
-tools_allowed: [web_search, note_append]
-tone: analytical
-output_schema: markdown_sections
-```
-
-```markdown
-# Doctype: ResearchBrief
-sections:
-  - Topic
-  - Objective
-  - Findings
-acceptance_criteria:
-  - Each section is present and non-empty
-  - Sources are cited
+3. [Blocker] I need the expected return format for `GET /users/me`.
+4. [Tool: send_message(recipient="agents/backend-mem.md", content="What is the JSON schema for GET /users/me?")]
+5. [Incoming Message from Backend Agent]:
+   > The schema is `{ "id": "uuid", "email": "string" }`.
+6. [Action] updating TypeScript interface...
 ```
 
 ---
 
-### **6. Extensibility**
+### **5. Extension & Compatibility**
 
-* **Composable definitions** — any document can extend or override another via inheritance.
-* **Pluggable runtimes** — compatible with MCP, Notion API, or local Markdown stores.
-* **Cross-agent orchestration** — workflows may spawn sub-agents via linked documents.
-* **Self-evolution** — new doctypes and agents can be generated by the system itself.
+*   **MCP Compatibility**: Airic v0.2 treats **MCP Servers as Memory Sources** and **MCP Tools as Skill Components**, allowing seamless integration with the Model Context Protocol.
+*   **Self-Evolution**: Since Skills are documents, an Agent can be tasked to improve a Skill Document, effectively "learning" or "optimizing" its own future behavior.
 
 ---
 
-### **7. Use Cases**
+### **6. License**
 
-* Collaborative knowledge work (research, planning, review)
-* AI-native project management and documentation systems
-* Enterprise compliance workflows with auditability
-* Developer frameworks for structured, context-aware agent execution
-
----
-
-### **8. Compatibility**
-
-Airic’s model aligns conceptually with:
-
-* **Anthropic Skills** — runtime persona switching
-* **Notion Agents** — document-defined context
-* **OpenAI MCP** — structured model context protocol
-
-Airic generalizes these into a single, declarative, recursively self-describing framework.
-
----
-
-### **9. License**
-
-Draft specification — © Leric 2025.
-Released under the **CC BY-SA 4.0** license for open research and implementation.
+Draft specification — © Leric 2026.
+Released under the **CC BY-SA 4.0** license.
